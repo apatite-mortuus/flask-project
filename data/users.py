@@ -13,6 +13,7 @@ class User(SqlAlchemyBase, UserMixin):
     email = sqlalchemy.Column(sqlalchemy.String, unique=True)
     nickname = sqlalchemy.Column(sqlalchemy.String, unique=True)
     hashed_password = sqlalchemy.Column(sqlalchemy.String, nullable=True)
+    audiofile = orm.relationship("Audiofile", back_populates='user')
 
     def set_password(self, password):
         self.hashed_password = generate_password_hash(password)

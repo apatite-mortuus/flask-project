@@ -2,4 +2,35 @@
 
 {% block content %}
 
+{% if current_user.is_authenticated %}
+<p>
+    <a class="btn btn-primary" href="/post_audio">Опубликовать новую аудиозапись</a>
+</p>
+{% endif %}
+
+<h1>Новые аудиозаписи:</h1>
+<table class="table">
+    <thead>
+    <tr class="table-secondary">
+        <th>Аудиофайл</th>
+        <th>Название</th>
+        <th>Автор</th>
+        <th>Опубликовал</th>
+        <th>Дата публикации</th>
+    </tr>
+    </thead>
+    <tbody>
+    {% for file in files %}
+    <tr class="table-secondary">
+        <td><audio src="{{ file.path_to_file }}" controls></audio></td>
+        <td>{{ file.title }}</td>
+        <td>{{ file.author }}</td>
+        <td>{{ file.nickname }}</td>
+        <td>{{ file.date_time }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+
+</table>
+
 {% endblock %}
