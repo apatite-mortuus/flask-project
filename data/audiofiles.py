@@ -14,4 +14,6 @@ class Audiofile(SqlAlchemyBase, UserMixin):
     author = sqlalchemy.Column(sqlalchemy.String, nullable=True)
     posted = sqlalchemy.Column(sqlalchemy.Integer, sqlalchemy.ForeignKey("users.id"), nullable=True)
     date_time = sqlalchemy.Column(sqlalchemy.String, nullable=True)
+    likes = sqlalchemy.Column(sqlalchemy.Integer, nullable=True)
+    dislikes = sqlalchemy.Column(sqlalchemy.Integer, nullable=True)
     user = orm.relationship("User")

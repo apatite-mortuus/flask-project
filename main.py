@@ -1,7 +1,7 @@
 import datetime
 import secrets
 
-from flask import Flask, render_template, redirect, request, url_for
+from flask import Flask, render_template, redirect, request, url_for, abort
 from flask_login import LoginManager, login_user, current_user, login_required, logout_user
 
 from data.users import User
@@ -27,9 +27,11 @@ def load_user(user_id):
 @app.route("/index")
 def index():
     db_sess = db_session.create_session()
-    files = db_sess.query(Audiofile.path_to_file, Audiofile.title, Audiofile.author, User.nickname, Audiofile.date_time).outerjoin(User, Audiofile.posted == User.id).all()
-    print(files, "A")
-    return render_template("index.html", files=files)
+    files = db_sess.query(Audiofile.path_to_file, Audiofile.title, Audiofile.author,
+                          User.nickname, Audiofile.date_time,
+                          Audiofile.posted, Audiofile.id, Audiofile.likes,
+                          Audiofile.dislikes).outerjoin(User, Audiofile.posted == User.id).all()
+    return render_template("index.html", files=files, title="Главная | DemCoHub")
 
 
 @app.route("/register", methods=["GET", "POST"])
@@ -57,7 +59,7 @@ def register():
         db_sess.add(user)
         db_sess.commit()
         return redirect("/login")
-    return render_template("register_form.html", title="Регистрация", form=form)
+    return render_template("register_form.html", title="Регистрация | DemCoHub", form=form)
 
 
 @app.route('/login', methods=["GET", "POST"])
@@ -69,8 +71,9 @@ def login():
         if user and user.check_password(form.password.data):
             login_user(user, remember=form.remember_me.data)
             return redirect("/")
-        return render_template('login_form.html', message="Неправильный логин или пароль", form=form)
-    return render_template('login_form.html', title='Авторизация', form=form)
+        return render_template('login_form.html', message="Неправильный логин или пароль", form=form,
+                               title='Авторизация | DemCoHub')
+    return render_template('login_form.html', title='Авторизация | DemCoHub', form=form)
 
 
 @app.route('/logout')
@@ -90,7 +93,9 @@ def post_audio():
             author=form.author.data,
             title=form.title.data,
             posted=current_user.id,
-            date_time=datetime.datetime.now()
+            date_time=datetime.datetime.now(),
+            likes=0,
+            dislikes=0
         )
         if request.method == "POST":
             url = ""
@@ -113,9 +118,41 @@ def post_audio():
         db_sess.add(audiofile)
         db_sess.commit()
         return redirect("/")
-    return render_template("post_audio_form.html", title="Публикация", form=form)
+    return render_template("post_audio_form.html", title="Публикация | DemCoHub", form=form)
 
 
+@app.route('/audio_delete/<int:id>', methods=['GET', 'POST'])
+@login_required
+def audio_delete(id):
+    db_sess = db_session.create_session()
+    audio = db_sess.query(Audiofile).filter(Audiofile.id == id,
+                                            current_user.id == Audiofile.posted
+                                            ).first()
+    if audio:
+        db_sess.delete(audio)
+        db_sess.commit()
+    else:
+        abort(404)
+    return redirect('/')
+
+
+@app.route("/<nickname>")
+def profile(nickname):
+    db_sess = db_session.create_session()
+    if not current_user.is_authenticated or current_user.nickname != nickname:
+        files = db_sess.query(Audiofile.path_to_file, Audiofile.author, Audiofile.likes,
+                              Audiofile.dislikes, Audiofile.title, Audiofile.date_time,
+                              User.nickname).outerjoin(User, Audiofile.posted == User.id).filter(
+            User.nickname == nickname).all()
+        return render_template("profile.html", files=files, title=f"{nickname} | DemCoHub", user=files[0].nickname)
+    files = db_sess.query(Audiofile).filter(Audiofile.posted == current_user.id).all()
+    return render_template("profile.html", files=files, title=f"{current_user.nickname} | DemCoHub")
+
+
+@app.route("/<nickname>/<repository>")
+@login_required
+def show_repository(nickname, repository):
+    db_sess = db_session.create_session()
 
 
 if __name__ == "__main__":

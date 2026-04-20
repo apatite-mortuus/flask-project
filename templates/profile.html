@@ -3,19 +3,18 @@
 {% block content %}
 
 {% if current_user.is_authenticated %}
-<p>
-    <a class="btn btn-primary" href="/post_audio">Опубликовать новую аудиозапись</a>
-</p>
+    <p>{{ current_user.nickname }}</p>
+    <p>{{ current_user.email }}</p>
+{% else %}
+    <p>{{ user }}</p>
 {% endif %}
-
-<h1>Новые аудиозаписи:</h1>
+<h1>Опубликованные аудиозаписи</h1>
 <table class="table">
     <thead>
     <tr class="table-secondary">
         <th>Название</th>
         <th>Аудиофайл</th>
         <th>Автор</th>
-        <th>Опубликовал</th>
         <th>Дата публикации</th>
         <th>Оценки:</th>
     </tr>
@@ -28,7 +27,6 @@
             <audio src="{{ file.path_to_file }}" controls></audio>
         </td>
         <td>{{ file.author }}</td>
-        <td>{{ file.nickname }}</td>
         <td>{{ file.date_time }}</td>
         <td>
             <button id="like">like</button>
