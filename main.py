@@ -1,15 +1,24 @@
 import datetime
 import secrets
+import pathlib
+import os
 
-from flask import Flask, render_template, redirect, request, url_for, abort
+from flask import Flask, render_template, redirect, request, url_for, abort, jsonify
 from flask_login import LoginManager, login_user, current_user, login_required, logout_user
 
 from data.users import User
 from data.audiofiles import Audiofile
+from data.likes import Likes
+from data.dislikes import Dislikes
+from data.repositories import Repositories
+from data.branches import Branches
+from data.commits import Commits
 from data import db_session
 from forms.login_form import LoginForm
 from forms.register_form import RegisterForm
 from forms.post_audio_form import PostAudioForm
+from forms.repo_form import RepoForm
+from forms.branch_form import BranchForm
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = secrets.token_urlsafe(32)
@@ -27,11 +36,44 @@ def load_user(user_id):
 @app.route("/index")
 def index():
     db_sess = db_session.create_session()
-    files = db_sess.query(Audiofile.path_to_file, Audiofile.title, Audiofile.author,
-                          User.nickname, Audiofile.date_time,
-                          Audiofile.posted, Audiofile.id, Audiofile.likes,
-                          Audiofile.dislikes).outerjoin(User, Audiofile.posted == User.id).all()
+    files = db_sess.query(Audiofile).all()
     return render_template("index.html", files=files, title="Главная | DemCoHub")
+
+
+@app.route("/like", methods=["POST"])
+def like():
+    db_sess = db_session.create_session()
+    file = db_sess.query(Likes).filter(Likes.author_id == current_user.id,
+                                       Likes.audiofile == request.form["id"]).first()
+    if file:
+        db_sess.delete(file)
+        db_sess.commit()
+        return jsonify({"status": "OK", "response": "deleted"})
+    lk = Likes(
+        audiofile=request.form["id"],
+        author_id=current_user.id
+    )
+    db_sess.add(lk)
+    db_sess.commit()
+    return jsonify({"status": "OK", "response": "created"})
+
+
+@app.route("/dislike", methods=["POST"])
+def dislike():
+    db_sess = db_session.create_session()
+    file = db_sess.query(Dislikes).filter(Dislikes.author_id == current_user.id,
+                                          Dislikes.audiofile == request.form["id"]).first()
+    if file:
+        db_sess.delete(file)
+        db_sess.commit()
+        return jsonify({"status": "OK", "response": "deleted"})
+    dlk = Dislikes(
+        audiofile=request.form["id"],
+        author_id=current_user.id
+    )
+    db_sess.add(dlk)
+    db_sess.commit()
+    return jsonify({"status": "OK", "response": "created"})
 
 
 @app.route("/register", methods=["GET", "POST"])
@@ -39,18 +81,15 @@ def register():
     form = RegisterForm()
     if form.validate_on_submit():
         if form.password.data != form.repeat_password.data:
-            return render_template("register_form.html", title="Регистрация",
-                                   form=form,
-                                   message="Пароли не совпадают")
+            return render_template("register_form.html", title="Регистрация | DemCoHub",
+                                   form=form, message="Пароли не совпадают")
         db_sess = db_session.create_session()
         if db_sess.query(User).filter(User.email == form.email.data).first():
-            return render_template("register_form.html", title="Регистрация",
-                                   form=form,
-                                   message="Такой пользователь уже есть")
+            return render_template("register_form.html", title="Регистрация | DemCoHub",
+                                   form=form, message="Такой пользователь уже есть")
         if db_sess.query(User).filter(User.nickname == form.nickname.data).first():
-            return render_template("register_form.html", title="Регистрация",
-                                   form=form,
-                                   message="Пользователь с таким никнеймом уже есть")
+            return render_template("register_form.html", title="Регистрация | DemCoHub",
+                                   form=form, message="Пользователь с таким никнеймом уже есть")
         user = User(
             nickname=form.nickname.data,
             email=form.email.data
@@ -93,9 +132,7 @@ def post_audio():
             author=form.author.data,
             title=form.title.data,
             posted=current_user.id,
-            date_time=datetime.datetime.now(),
-            likes=0,
-            dislikes=0
+            date_time=datetime.datetime.now()
         )
         if request.method == "POST":
             url = ""
@@ -105,10 +142,13 @@ def post_audio():
                     f.write(img.read())
                     url = f"upload/public_audio/{img.filename}"
             except FileExistsError:
+                i = 1
                 while True:
-                    i = 1
                     try:
-                        with open(f"static/upload/public_audio/{img.filename} ({i})", "xb") as f:
+                        print(i)
+                        with open(
+                                f"static/upload/public_audio/{img.filename.rsplit(".", 1)[0]} ({i}).{img.filename.rsplit(".", 1)[1]}",
+                                "xb") as f:
                             f.write(img.read())
                             url = f"upload/public_audio/{img.filename}"
                             break
@@ -125,9 +165,7 @@ def post_audio():
 @login_required
 def audio_delete(id):
     db_sess = db_session.create_session()
-    audio = db_sess.query(Audiofile).filter(Audiofile.id == id,
-                                            current_user.id == Audiofile.posted
-                                            ).first()
+    audio = db_sess.query(Audiofile).filter(Audiofile.id == id, current_user.id == Audiofile.posted).first()
     if audio:
         db_sess.delete(audio)
         db_sess.commit()
@@ -139,20 +177,107 @@ def audio_delete(id):
 @app.route("/<nickname>")
 def profile(nickname):
     db_sess = db_session.create_session()
+    files = db_sess.query(Audiofile).join(Audiofile.user).filter(User.nickname == nickname).all()
     if not current_user.is_authenticated or current_user.nickname != nickname:
-        files = db_sess.query(Audiofile.path_to_file, Audiofile.author, Audiofile.likes,
-                              Audiofile.dislikes, Audiofile.title, Audiofile.date_time,
-                              User.nickname).outerjoin(User, Audiofile.posted == User.id).filter(
-            User.nickname == nickname).all()
-        return render_template("profile.html", files=files, title=f"{nickname} | DemCoHub", user=files[0].nickname)
-    files = db_sess.query(Audiofile).filter(Audiofile.posted == current_user.id).all()
+        return render_template("profile.html", files=files, title=f"{nickname} | DemCoHub", user=nickname)
     return render_template("profile.html", files=files, title=f"{current_user.nickname} | DemCoHub")
 
 
-@app.route("/<nickname>/<repository>")
+@app.route("/create_repository", methods=["GET", "POST"])
 @login_required
+def create_repository():
+    form = RepoForm()
+    if form.validate_on_submit():
+        db_sess = db_session.create_session()
+        if db_sess.query(Repositories).join(Repositories.user).filter(Repositories.title == form.title.data,
+                                                                      User.id == current_user.id).first():
+            return render_template("repository_form.html", title="Создание репозитория | DemCoHub",
+                                   form=form, message="Репозиторий с таким именем уже существует")
+        repo = Repositories(
+            title=form.title.data,
+            description=form.description.data,
+            author_id=current_user.id
+        )
+        db_sess.add(repo)
+        branch = Branches(
+            title="master",
+            repository_id=db_sess.query(Repositories).join(Repositories.user).filter(
+                Repositories.title == form.title.data,
+                User.id == current_user.id).first().id
+        )
+        db_sess.add(branch)
+        db_sess.commit()
+        pathlib.Path(f"static/upload/users/{current_user.nickname}/repositories/{form.title.data}/commits").mkdir(
+            exist_ok=True, parents=True)
+        return redirect(f"/{current_user.nickname}/repositories")
+    return render_template("repository_form.html", title="Создание репозитория | DemCoHub", form=form)
+
+
+@app.route("/<nickname>/repositories")
+def repositories_list(nickname):
+    db_sess = db_session.create_session()
+    repos = db_sess.query(Repositories).join(Repositories.user).filter(User.nickname == nickname).all()
+    if not current_user.is_authenticated or current_user.nickname != nickname:
+        return abort(403)
+    return render_template("repositories_list.html", repos=repos, title=f"Ваши репозитории | DemCoHub")
+
+
+@app.route("/<nickname>/repositories/<repository>")
 def show_repository(nickname, repository):
     db_sess = db_session.create_session()
+    branches = db_sess.query(Branches).join(Branches.repository).filter(Repositories.title == repository).all()
+    print(branches, "BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB")
+    if not current_user.is_authenticated or current_user.nickname != nickname:
+        return abort(403)
+    return render_template("repository.html", branches=branches, title=f"{repository} | DemCoHub")
+
+
+@app.route("/<nickname>/repositories/<repository>/<branch>")
+def show_branch(nickname, repository, branch):
+    db_sess = db_session.create_session()
+    commits = db_sess.query(Branches.commits).filter(Branches.title == branch).all()
+    print(commits, "AAAAA")
+    if not current_user.is_authenticated or current_user.nickname != nickname:
+        return abort(403)
+    return render_template("branch.html", nickname=nickname, repository=repository, branch=branch, commits=commits,
+                           title=f"{repository} | DemCoHub")
+
+
+@app.route("/<repository>/create_branch", methods=["GET", "POST"])
+@login_required
+def create_branch(repository):
+    form = BranchForm()
+    db_sess = db_session.create_session()
+    form.parent.choices = db_sess.query(Branches.title).join(Branches.repository).join(Repositories.user).filter(
+        User.id == current_user.id).all()
+    if form.validate_on_submit():
+        if db_sess.query(Branches).join(Branches.repository).join(Repositories.user).filter(
+                Branches.title == form.title.data,
+                User.id == current_user.id).first():
+            return render_template("branch_form.html", title="Создание ветки | DemCoHub",
+                                   form=form, message="Ветка с таким именем уже существует")
+        branch = Branches(
+            title=form.title.data,
+            repository_id=db_sess.query(Repositories.id).filter(Repositories.id == repository).first(),
+            commits=db_sess.query(Branches.commits).filter(Branches.title == form.parent.data).first()
+        )
+        db_sess.add(branch)
+        db_sess.commit()
+        return redirect(f"/{current_user.nickname}/repositories/{repository}")
+    return render_template("branch_form.html", title="Создание ветки | DemCoHub", form=form)
+
+
+@app.route("/<nickname>/repositories/<repository>/<branch>/<commit>")
+def show_commit(nickname, repository, branch, commit):
+    db_sess = db_session.create_session()
+    commit = db_sess.query(Commits).filter(Commits.sha1 == commit).first()
+    dr = [(i, os.path.isfile(commit.path + "/" + i)) for i in os.listdir(commit.path)]
+    print(dr)
+    return jsonify({"status": "OK"})
+    # print(commits, "AAAAA")
+    # if not current_user.is_authenticated or current_user.nickname != nickname:
+    #     return abort(403)
+    # return render_template("branch.html", branch=branch, commits=commits, title=f"{repository} | DemCoHub")
 
 
 if __name__ == "__main__":

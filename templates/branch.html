@@ -1,0 +1,22 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<!--<p>-->
+<!--    <a class="btn btn-primary" href="/create_repository">Создать новый репозиторий</a>-->
+<!--</p>-->
+
+<h1>Коммиты в ветке {{ branch }}</h1>
+<table class="table">
+    <tbody>
+    {% for commit in commits %}
+    <tr class="table-secondary">
+        <td>{<a href="/{{ nickname }}/repositories/{{ repository }}/{{ branch }}/{{ commit.sha1 }}">{{
+                commit.description }}</a></td>
+        <td>{{ commit.sha1 }}</td>
+        <td>{{ commit.date_time }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

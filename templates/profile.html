@@ -5,8 +5,10 @@
 {% if current_user.is_authenticated %}
     <p>{{ current_user.nickname }}</p>
     <p>{{ current_user.email }}</p>
+    <a href="/{{ current_user.nickname }}/repositories">Репозитории</a>
 {% else %}
     <p>{{ user }}</p>
+    <a href="/{{ user }}/repositories">Репозитории</a>
 {% endif %}
 <h1>Опубликованные аудиозаписи</h1>
 <table class="table">
@@ -29,10 +31,12 @@
         <td>{{ file.author }}</td>
         <td>{{ file.date_time }}</td>
         <td>
-            <button id="like">like</button>
-            <label for="like">{{ file.likes }}</label>
-            <button id="dislike">dislike</button>
-            <label for="dislike">{{ file.dislikes }}</label>
+            <button class="like" data-id="{{ file.id }}"
+                    {% if not current_user.is_authenticated %} disabled {% endif %}>like {{ file.likes|length }}
+            </button>
+            <button class="dislike" data-id="{{ file.id }}"
+                    {% if not current_user.is_authenticated %} disabled {% endif %}>dislike {{ file.dislikes|length }}
+            </button>
             {% if current_user.is_authenticated and current_user.id == file.posted %}
             <div>
                 <a href="/audio_delete/{{ file.id }}" class="btn btn-danger">
@@ -46,4 +50,37 @@
     </tbody>
 </table>
 
+<script>
+    const likeBtn = document.querySelectorAll(".like");
+    likeBtn.forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+        let xhr = new XMLHttpRequest();
+        let formData = new FormData();
+        formData.append("id", btn.dataset.id);
+        xhr.open("POST", "/like");
+        xhr.send(formData);
+        xhr.onload = function() {
+        if (JSON.parse(xhr.response).response == "created") {
+            btn.textContent = `like ${(parseInt(btn.textContent.split(" ")[1]) + 1)}`;
+        } else {
+            btn.textContent = `like ${(parseInt(btn.textContent.split(" ")[1]) - 1)}`;
+        }};
+    })});
+    const dislikeBtn = document.querySelectorAll(".dislike");
+    dislikeBtn.forEach((btn) => {
+        btn.addEventListener("click", (e) => {
+        let xhr = new XMLHttpRequest();
+        let formData = new FormData();
+        formData.append("id", btn.dataset.id);
+        xhr.open("POST", "/dislike");
+        xhr.send(formData);
+        xhr.onload = function() {
+        console.log(JSON.parse(xhr.response).response);
+        if (JSON.parse(xhr.response).response == "created") {
+            btn.textContent = `dislike ${(parseInt(btn.textContent.split(" ")[1]) + 1)}`;
+        } else {
+            btn.textContent = `dislike ${(parseInt(btn.textContent.split(" ")[1]) - 1)}`;
+        }};
+    })});
+</script>
 {% endblock %}

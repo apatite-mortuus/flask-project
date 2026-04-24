@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<p>
+    <a class="btn btn-primary" href="/create_repository">Создать новый репозиторий</a>
+</p>
+
+<h1>Репозитории пользователя:</h1>
+<table class="table">
+    <thead>
+    <tr class="table-secondary">
+        <th>Название</th>
+        <th>Описание</th>
+    </tr>
+    </thead>
+    <tbody>
+    {% for repo in repos %}
+    <tr class="table-secondary">
+        <td><a href="/{{ repo.user.nickname }}/repositories/{{ repo.title }}">{{ repo.title }}</a></td>
+        <td>{{ repo.description }}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
