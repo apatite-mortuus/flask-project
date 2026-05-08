@@ -18,10 +18,15 @@
         <tr class="table-secondary">
             <td><a href="{{ url_for('show_repository', nickname=repo.user.nickname, repository=repo.title) }}">{{
                 repo.title }}</a></td>
-            <td>{{ repo.user.nickname }}</td>
+            <td>
+                <a href="{{ url_for('profile', nickname=repo.user.nickname) }}">
+                    {{ repo.user.nickname }}</a>
+            </td>
             <td>{{ repo.description }}</td>
             <td>{% for author in repo.coauthors %}
-                <ul>{{ author.nickname }}</ul>
+                <a href="{{ url_for('profile', nickname=author.nickname) }}">
+                    <ul>{{ author.nickname }}</ul>
+                </a>
                 {% endfor %}
             </td>
         </tr>

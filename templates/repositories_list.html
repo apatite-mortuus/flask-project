@@ -23,7 +23,8 @@
                 repo.title }}</a></td>
             <td>{{ repo.description }}</td>
             <td>{% for author in repo.coauthors %}
-                <ul>{{ author.nickname }}</ul>
+                <a href="{{ url_for('profile', nickname=author.nickname) }}">
+                <ul>{{ author.nickname }}</ul></a>
                 {% endfor %}
             </td>
         </tr>
